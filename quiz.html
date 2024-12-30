@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trivia Quiz Game</title>
+    <!-- Importing the 'Poppins' font from Google Fonts for better readability and aesthetic appeal -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <style>
+
+        /* global styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            
+            background: #001e4d;
+            font-family: 'Poppins', sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+         /* game card styles */
+        .game-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .game-card {
+            background-position: transparent;
+            backdrop-filter: blur(10px);
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            width: 500px;
+            border: 5px solid white;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            color: navy;
+            margin-bottom: 10px;
+        }
+
+        .question-container h3 {
+            color: #444;
+            margin-bottom: 20px;
+        }
+
+        .category-text {
+            color: navy;
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        .answers-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        /* answer button */
+        button.answer {
+            background-color:navy;
+            color: #fff;
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.3s;
+        }
+
+        button.answer:hover {
+            background-color: rgb(21, 21, 159);
+            transform: scale(1.05);
+        }
+
+        button.correct {
+            background-color: #15ce1b;
+        }
+
+        button.incorrect {
+            background-color:orangered;
+        }
+
+        .start-btn {
+            background-color: orange;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.1s;
+        }
+
+        .start-btn:hover {
+            background-color: orange;
+            transform: scale(1.05);
+        }
+
+        /* status bar */
+        .status-bar {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            color: #444;
+        }
+
+        .status-bar p {
+            font-size: 1rem;
+        }
+
+        /* progress bar */
+        .progress-bar {
+            height: 5px;
+            background-color: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        #progress {
+            width: 0%;
+            height: 100%;
+            background-color: navy;
+            transition: width 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-card">
+            <header>
+                <h1>Quiz Game</h1>
+            </header>
+            <div class="status-bar">
+                <p>Score: <span id="score">0</span></p>
+                <p>Questions : <span id="questions-answered">0</span></p>
+                <p>Time Left: <span id="time">120</span> sec</p>
+            </div>
+            <div class="game-content">
+                <div class="progress-bar">
+                    <div id="progress"></div>
+                </div>
+
+                <div class="question-container">
+                    <p id="category" class="category-text">Category: HTML</p>
+                    <h3 id="question">What is the full form of HTTP?</h3>
+                </div>
+
+                <div class="answers-container">
+                    <button class="answer" data-id="1">Hyper text transfer package</button>
+                    <button class="answer" data-id="2">Hyper text transfer protocol</button>
+                    <button class="answer" data-id="3">Hyphenation text test program</button>
+                    <button class="answer" data-id="4">None of the above</button>
+                </div>
+                <button id="start" class="start-btn">NEXT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize variables to keep track of quiz state
+        let shuffledQuestions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let timeLeft = 120; // 2 minutes
+        let timerInterval;
+        let progress = 0;
+        let questionsAnswered = 0;
+
+        //  Get DOM elements to manipulate later
+        const categoryElem = document.getElementById('category');
+        const questionElem = document.getElementById('question');
+        const answerButtons = document.querySelectorAll('.answer');
+        const scoreElem = document.getElementById('score');
+        const questionsAnsweredElem = document.getElementById('questions-answered');
+        const timeElem = document.getElementById('time');
+        const progressElem = document.getElementById('progress');
+        const startButton = document.getElementById('start');
+     
+        // Function to load questions from the API
+        async function loadQuestions() {
+            // Fetch questions from Open Trivia Database API
+            const response = await fetch('https://opentdb.com/api.php?amount=50&difficulty=medium&type=multiple');
+            const data = await response.json();
+
+            // Map and format the question data
+            return data.results.map(question => ({
+                question: question.question,
+                category: question.category,
+                options: [...question.incorrect_answers, question.correct_answer],
+                correct: question.correct_answer
+            }));
+        }
+
+        // Function to shuffle an array using Fisher-Yates algorithm
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        //  Function to start the game
+        function startGame() {
+            // Reset game state
+            score = 0;
+            questionsAnswered = 0;
+            currentQuestionIndex = 0;
+            scoreElem.innerText = score;
+            questionsAnsweredElem.innerText = questionsAnswered;
+            startButton.disabled = true;
+            timeLeft = 120; // 2 minutes
+            timeElem.innerText = timeLeft;
+
+            // Load and shuffle questions
+            loadQuestions().then(questions => {
+                shuffledQuestions = questions;
+                shuffle(shuffledQuestions);
+                timerInterval = setInterval(updateTimer, 1000);  // Start the timer
+                 loadQuestion(); // Load the first question
+            });
+        }
+
+        // Function to load a question and update the DOM
+        function loadQuestion() {
+            const questionData = shuffledQuestions[currentQuestionIndex];
+
+            // Update category and question text
+            categoryElem.innerText = `Category: ${questionData.category}`;
+            questionElem.innerHTML = questionData.question;
+
+            // Shuffle answer options
+            shuffle(questionData.options);
+
+            // Update answer buttons and add event listeners
+            answerButtons.forEach((btn, index) => {
+                btn.innerText = questionData.options[index];
+                btn.classList.remove('correct', 'incorrect');
+                btn.disabled = false;
+                btn.onclick = () => checkAnswer(index);
+            });
+
+            // Update progress bar based on time left
+            progress = ((120 - timeLeft) / 120) * 100; // Update progress based on time
+            progressElem.style.width = `${progress}%`;
+        }
+
+        //  Function to update the timer and progress bar
+        function updateTimer() {
+            timeLeft--;
+            timeElem.innerText = timeLeft;
+            progress = ((120 - timeLeft) / 120) * 100; // Update progress based on time
+            progressElem.style.width = `${progress}%`;
+
+            // End the game when time runs out
+            if (timeLeft === 0) {
+                clearInterval(timerInterval);
+                endGame();
+            }
+        }
+
+        function checkAnswer(selectedIndex) {
+    const questionData = shuffledQuestions[currentQuestionIndex];
+
+    // Mark correct and incorrect answers
+    answerButtons.forEach((btn, index) => {
+        if (btn.innerText === questionData.correct) {
+            btn.classList.add('correct'); // Removed extra space
+        }
+        if (index === selectedIndex && btn.innerText !== questionData.correct) {
+            btn.classList.add('incorrect');
+        }
+        btn.disabled = true; // Disable all buttons after selection
+    });
+
+    // Update score if the correct answer is selected
+    if (answerButtons[selectedIndex].innerText === questionData.correct) {
+        score++;
+    }
+
+    scoreElem.innerText = score;
+    questionsAnswered++;
+    questionsAnsweredElem.innerText = questionsAnswered;
+
+    setTimeout(nextQuestion, 1000); // Move to the next question after a delay
+}
+
+// Function to load the next question
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex >= shuffledQuestions.length) {
+                currentQuestionIndex = 0; // Restart from the beginning
+            }
+            if (timeLeft > 0) {
+                loadQuestion();
+            }
+        }
+
+        // Function to end the game and store the score
+        function endGame() {   
+            localStorage.setItem("gameScore", score);
+            window.open("score.html","_blank")
+        }
+
+        // Add event listener to start button
+        startButton.addEventListener('click', startGame);
+
+    </script>
+</body>
+</html>
